@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+*.xml
+
+.idea/CS3243-Sudoku.iml
+
+outputs/
