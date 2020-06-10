@@ -3,6 +3,7 @@
 
 import sys
 import copy
+import operator
 
 
 # Running script: given code can be run with the command:
@@ -11,112 +12,84 @@ import copy
 
 class Node:
     def __init__(self, unassigned_vars, assigned_vars):
-        unassigned_vars.sort(key=lambda x: len(x.domain), reverse=False)
+        unassigned_vars.sort(key=lambda x: len(x.domain))
         self.variables = unassigned_vars
         self.assigned_vars = assigned_vars
 
 
 class Cell:
-    def __init__(self, cell_id, dom, new_number):
+    def __init__(self, cell_id, dom):
         self.domain = dom
         self.cell_id = cell_id
-        self.assigned_number = new_number
-
-    def assign_number(self, new_number):
-        new_cell = Cell(self.cell_id, set(), new_number)
-        new_cell.remove_domain()
-        return new_cell
 
     def remove_number(self, current_number):
         if current_number in self.domain:
             self.domain.remove(current_number)
 
-    def remove_domain(self):
-        del self.domain
 
-    def get_row(self):
-        return (self.cell_id - 1) // 9 + 1
-
-    def get_col(self):
-        return (self.cell_id - 1) % 9 + 1
-
-    def get_box(self):
-        return ((self.get_row() - 1) // 3) * 3 + (((self.get_col() - 1) // 3) + 1)
-
-
-def init_solve(puzzle_grid):
+def init_solve(puzzle_grid, coordinates):
     unassigned_vars = []
     assigned_vars = dict()
     cell_id = 1
 
-    for index in xrange(0, len(puzzle_grid)):
-        for index2 in xrange(0, len(puzzle_grid[index])):
+    for index in xrange(0, 9):
+        for index2 in xrange(0, 9):
 
             cell_integer = puzzle_grid[index][index2]
             if cell_integer != 0:
                 assigned_vars[cell_id] = cell_integer
             else:
                 domain = set(xrange(1, 10))
-                unassigned_vars.append(Cell(cell_id, domain, cell_integer))
+                unassigned_vars.append(Cell(cell_id, domain))
 
+            coordinates[cell_id] = (index + 1, index2 + 1, (index // 3) * 3 + ((index2 // 3) + 1))
             cell_id += 1
 
-    return init_domain_update(unassigned_vars, assigned_vars)
+    return init_domain_update(unassigned_vars, assigned_vars, coordinates)
 
 
-def init_domain_update(unassigned_vars, assigned_vars):
+def init_domain_update(unassigned_vars, assigned_vars, coordinates):
     for init_var in assigned_vars.items():
-        row_num = (init_var[0] - 1) // 9 + 1
-        col_num = (init_var[0] - 1) % 9 + 1
-        box_num = ((row_num - 1) // 3) * 3 + (((col_num - 1) // 3) + 1)
+        retrieved_num = coordinates.get(init_var[0])
+        row_num = retrieved_num[0]
+        col_num = retrieved_num[1]
+        box_num = retrieved_num[2]
 
-        for index_2 in xrange(0, len(unassigned_vars)):
-            unassigned_row_num = unassigned_vars[index_2].get_row()
-            unassigned_col_num = unassigned_vars[index_2].get_col()
-            unassigned_box_num = unassigned_vars[index_2].get_box()
+        for unassigned_var in unassigned_vars:
+            retrieved_unassigned_num = coordinates.get(unassigned_var.cell_id)
 
-            if (row_num == unassigned_row_num
-                    or col_num == unassigned_col_num
-                    or box_num == unassigned_box_num):
-                unassigned_vars[index_2].remove_number(init_var[1])
+            if (row_num == retrieved_unassigned_num[0]
+                    or col_num == retrieved_unassigned_num[1]
+                    or box_num == retrieved_unassigned_num[2]):
+                unassigned_var.remove_number(init_var[1])
 
     return Node(unassigned_vars, assigned_vars)
 
 
-def domain_update(unassigned_vars, assigned_vars, number):
+def domain_update(unassigned_vars, assigned_vars, number, coordinates):
     working_list = []
     new_assigned_vars = assigned_vars.copy()
 
-    var = unassigned_vars[0].assign_number(number)
-    # new_assigned_vars.append(var)
-    new_assigned_vars[var.cell_id] = number
+    new_assigned_vars[unassigned_vars[0].cell_id] = number
 
-    for index in xrange(1, len(unassigned_vars)):
-        row_num = var.get_row()
-        col_num = var.get_col()
-        box_num = var.get_box()
+    retrieved_num = coordinates.get(unassigned_vars[0].cell_id)
+    row_num = retrieved_num[0]
+    col_num = retrieved_num[1]
+    box_num = retrieved_num[2]
 
-        if (row_num == unassigned_vars[index].get_row()
-                or col_num == unassigned_vars[index].get_col()
-                or box_num == unassigned_vars[index].get_box()):
+    iter_vars = iter(unassigned_vars)
+    next(iter_vars)
+    for unassigned_vars in iter_vars:
+        retrieved_unassigned_num = coordinates.get(unassigned_vars.cell_id)
 
-            if len(unassigned_vars[index].domain) > 0:
-                working_domain = set()
+        if (row_num == retrieved_unassigned_num[0]
+                or col_num == retrieved_unassigned_num[1]
+                or box_num == retrieved_unassigned_num[2]):
 
-                if number in unassigned_vars[index].domain:
-                    for n in unassigned_vars[index].domain:
-                        if number != n:
-                            working_domain.add(n)
-                else:
-                    for n in unassigned_vars[index].domain:
-                        working_domain.add(n)
-
-            else:
-                working_domain = set()
-            working_number = Cell(unassigned_vars[index].cell_id, working_domain, 0)
-            working_list.append(working_number)
+            working_list.append(Cell(unassigned_vars.cell_id,
+                                     unassigned_vars.domain.difference({number})))
         else:
-            working_list.append(unassigned_vars[index])
+            working_list.append(unassigned_vars)
 
     return Node(working_list, new_assigned_vars)
 
@@ -131,15 +104,17 @@ class Sudoku(object):
         # self.ans is a list of lists
         # outer list is the row, inner list is col-wise
         global current_state
-        stack = [init_solve(puzzle)]
+        coordinates = dict()
+        stack = [init_solve(puzzle, coordinates)]
 
-        while len(stack) > 0:
+        while stack:
             current_state = stack.pop()
 
-            if len(current_state.variables) > 0:
-                if len(current_state.variables[0].domain) > 0:
-                    for n in current_state.variables[0].domain:
-                        stack.append(domain_update(current_state.variables, current_state.assigned_vars, n))
+            if current_state.variables:
+                if current_state.variables[0].domain:
+                    assignment_list = find_value(current_state.variables, coordinates)
+                    for n in assignment_list:
+                        stack.append(domain_update(current_state.variables, current_state.assigned_vars, n, coordinates))
                 else:
                     # no vars with valid domains left.
                     # domain is valid when it is more than 0
@@ -150,12 +125,45 @@ class Sudoku(object):
                 break
 
         for var in current_state.assigned_vars.items():
-            row_num = (var[0] - 1) // 9
-            col_num = (var[0] - 1) % 9
+            coords = coordinates.get(var[0])
 
-            self.ans[row_num][col_num] = var[1]
+            self.ans[coords[0] - 1][coords[1] - 1] = var[1]
 
         return self.ans
+
+
+def find_value(variables, coordinates):
+    if len(variables[0].domain) == 1:
+        return [next(iter(variables[0].domain))]
+    else:
+        tracker = dict()
+
+        retrieved_num = coordinates.get(variables[0].cell_id)
+
+        row_num = retrieved_num[0]
+        col_num = retrieved_num[1]
+        box_num = retrieved_num[2]
+
+        for numbers in variables[0].domain:
+            tracker[numbers] = 1
+
+        iter_vars = iter(variables)
+        next(iter_vars)
+        for var in iter_vars:
+
+            other_retrieved_num = coordinates.get(var.cell_id)
+
+            if (row_num == other_retrieved_num[0]
+                    or col_num == other_retrieved_num[1]
+                    or box_num == other_retrieved_num[2]):
+                for scanning_var in var.domain:
+                    if scanning_var in tracker:
+                        tracker[scanning_var] += 1
+
+    ordered_variables = sorted(tracker.items(), key=lambda x: x[1])
+    assignment_list = map(operator.itemgetter(0), ordered_variables)
+
+    return assignment_list
 
 
 if __name__ == "__main__":
