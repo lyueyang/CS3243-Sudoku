@@ -9,10 +9,9 @@ import copy
 # python file.py, ./path/to/init_state.txt ./output/output.txt
 class Node:
     def __init__(self, list_of_variables):
-        list_copy = copy.deepcopy(list_of_variables)
-        list_copy.sort(key=lambda x: x.domain_size, reverse=False)
+        list_of_variables.sort(key=lambda x: x.domain_size, reverse=False)
 
-        self.variables = list_copy
+        self.variables = list_of_variables
         # self.puzzle = grid
 
 
@@ -139,8 +138,7 @@ class Sudoku(object):
                 continue
 
             if current_state.variables[0].domain_size < 10:
-                domain_list = copy.deepcopy(current_state.variables[0].domain)
-                for n in domain_list:
+                for n in current_state.variables[0].domain:
                     current_state.variables[0].assign_number(n)
                     unsorted_list = domain_update(current_state.variables)
                     stack.append(Node(unsorted_list))
