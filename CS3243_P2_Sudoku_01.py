@@ -77,8 +77,11 @@ def domain_update(unassigned_vars, assigned_vars, number, coordinates):
     col_num = retrieved_num[1]
     box_num = retrieved_num[2]
 
+    # skip the first element
     iter_vars = iter(unassigned_vars)
     next(iter_vars)
+
+    # update the domain of the rest of the variables
     for unassigned_vars in iter_vars:
         retrieved_unassigned_num = coordinates.get(unassigned_vars.cell_id)
 
@@ -86,12 +89,16 @@ def domain_update(unassigned_vars, assigned_vars, number, coordinates):
                 or col_num == retrieved_unassigned_num[1]
                 or box_num == retrieved_unassigned_num[2]):
 
-            working_list.append(Cell(unassigned_vars.cell_id,
-                                     unassigned_vars.domain.difference({number})))
+            # check if domain has only 1 domain left and then if the number is in it, return false
+            if len(unassigned_vars.domain) == 1 and number in unassigned_vars.domain:
+                return False, False
+            else:
+                working_list.append(Cell(unassigned_vars.cell_id, unassigned_vars.domain.difference({number})))
+
         else:
             working_list.append(unassigned_vars)
 
-    return Node(working_list, new_assigned_vars)
+    return True, Node(working_list, new_assigned_vars)
 
 
 class Sudoku(object):
@@ -111,15 +118,11 @@ class Sudoku(object):
             current_state = stack.pop()
 
             if current_state.variables:
-                if current_state.variables[0].domain:
-                    assignment_list = find_value(current_state.variables, coordinates)
-                    for n in assignment_list:
-                        stack.append(domain_update(current_state.variables, current_state.assigned_vars, n, coordinates))
-                else:
-                    # no vars with valid domains left.
-                    # domain is valid when it is more than 0
-                    # continue to quit this state
-                    continue
+                assignment_list = find_value(current_state.variables, coordinates)
+                for n in assignment_list:
+                    result = domain_update(current_state.variables, current_state.assigned_vars, n, coordinates)
+                    if result[0]:
+                        stack.append(result[1])
             else:
                 # no variables left to perform assignment
                 break
@@ -134,7 +137,7 @@ class Sudoku(object):
 
 def find_value(variables, coordinates):
     if len(variables[0].domain) == 1:
-        return [next(iter(variables[0].domain))]
+        return variables[0].domain
     else:
         tracker = dict()
 
